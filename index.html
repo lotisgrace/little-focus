@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f3edff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Little Focus</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f8f5ff;color:#46395d;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif}
+main{max-width:480px;margin:auto;padding:25px 17px 55px}
+h1{text-align:center;margin:10px 0 4px;font-size:32px}
+.subtitle{text-align:center;color:#9487a7;margin:0 0 25px}
+.card{background:white;border-radius:24px;padding:20px;margin:15px 0;box-shadow:0 5px 25px #74639812}
+.tabs{display:flex;gap:6px;background:#f3effa;padding:5px;border-radius:15px}
+button{font:inherit;font-weight:600;cursor:pointer;border:0;border-radius:13px;padding:13px 9px}
+.tabs button{flex:1;background:transparent;color:#77688f;font-size:14px}
+.tabs button.active{background:#826bb5;color:white}
+.center{text-align:center}
+.ring{width:240px;height:240px;border-radius:50%;margin:24px auto;background:conic-gradient(#9b83ce var(--progress,0%),#eee8f8 0);padding:10px}
+.inner{width:100%;height:100%;border-radius:50%;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#clock{font-size:56px;font-weight:750;font-variant-numeric:tabular-nums}
+.muted{color:#9588a8;font-size:13px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions button{flex:1;min-width:95px}
+.primary{background:#826bb5;color:white}
+.secondary{background:#f1ebfa;color:#665284}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.stat{text-align:center;background:#f7f3fc;border-radius:15px;padding:15px 5px}
+.stat strong{display:block;font-size:26px}
+h2{font-size:18px;margin:0 0 15px}
+label{display:block;margin:13px 0 6px;color:#75678b;font-size:13px}
+input,select{width:100%;padding:12px;border:1px solid #ded5eb;border-radius:12px;background:white;color:#46395d;font:inherit}
+.lengths{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.lengths input{min-width:0}
+[hidden]{display:none!important}
+footer{text-align:center;color:#998cab;font-size:12px;line-height:1.7}
+</style>
+</head>
+<body>
+<main>
+<h1>✿ Little Focus</h1>
+<p class="subtitle">One gentle step at a time ♡</p>
+
+<section class="card">
+<div class="tabs">
+<button class="active" data-life="personal">♡ Personal</button>
+<button data-life="work">▣ Work</button>
+</div>
+<p class="center muted" id="hint">A little time for yourself.</p>
+</section>
+
+<section class="card">
+<div class="tabs">
+<button class="active" data-mode="focus">Focus</button>
+<button data-mode="short">Short break</button>
+<button data-mode="long">Long break</button>
+</div>
+<p class="center muted" id="modeLabel">Time to focus 🌱</p>
+<div class="ring" id="ring">
+<div class="inner">
+<div id="clock">25:00</div>
+<span class="muted" id="message">Ready when you are</span>
+</div>
+</div>
+<div class="actions">
+<button class="primary" id="start">▶ Start</button>
+<button class="secondary" id="reset">↻ Reset</button>
+<button class="secondary" id="interrupt" hidden>Interrupted</button>
+</div>
+</section>
+
+<section class="card">
+<h2 id="statsTitle">Today's little wins</h2>
+<div class="stats">
+<div class="stat"><strong id="sessions">0</strong><span class="muted">Sessions</span></div>
+<div class="stat"><strong id="minutes">0</strong><span class="muted">Minutes</span></div>
+<div class="stat"><strong id="streak">0</strong><span class="muted">Day streak</span></div>
+</div>
+<p class="muted" id="interruptStats"></p>
+</section>
+
+<section class="card">
+<h2>Make it yours</h2>
+<label for="subject">Focus category</label>
+<select id="subject"></select>
+<div class="lengths">
+<div><label for="focusLength">Focus (min)</label><input id="focusLength" type="number" min="1" max="180"></div>
+<div><label for="shortLength">Short break</label><input id="shortLength" type="number" min="1" max="60"></div>
+<div><label for="longLength">Long break</label><input id="longLength" type="number" min="1" max="90"></div>
+</div>
+</section>
+<footer>Work and Personal progress are saved separately on this device.<br>Keep confidential client information out of the app.<br>Background notifications are not guaranteed.</footer>
+</main>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var key="little-focus-v4";
+var categories={
+personal:["Mathematics","MBA research","Reading","Devotion","Personal project","Other"],
+work:["KYC review","Account monitoring","Compliance","Reports","Administrative tasks","Other"]
+};
+var defaults={
+personal:{lengths:{focus:25,short:5,long:15},subject:"Mathematics"},
+work:{lengths:{focus:45,short:5,long:15},subject:"KYC review"}
+};
+var data={};
+try{data=JSON.parse(localStorage.getItem(key))||{}}catch(e){}
+["personal","work"].forEach(function(l){
+data[l]=Object.assign({},defaults[l],data[l]||{});
+data[l].lengths=Object.assign({},defaults[l].lengths,data[l].lengths||{});
+data[l].history=data[l].history||{};
+data[l].interruptions=data[l].interruptions||{};
+});
+function save(){try{localStorage.setItem(key,JSON.stringify(data))}catch(e){}}
+function day(d){
+d=d||new Date();
+return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+var life="personal",mode="focus",remaining=1500,total=1500,deadline=0,running=false,ticker=null;
+function message(s){$("message").textContent=s}
+function stats(){
+var t=data[life].history[day()]||{count:0,minutes:0};
+$("sessions").textContent=t.count||0;
+$("minutes").textContent=Math.round((t.minutes||0)*10)/10;
+var d=new Date(),streak=0;
+if(!(data[life].history[day(d)]||{}).count)d.setDate(d.getDate()-1);
+while((data[life].history[day(d)]||{}).count){streak++;d.setDate(d.getDate()-1)}
+$("streak").textContent=streak;
+var i=data[life].interruptions[day()]||{count:0,minutes:0};
+$("interruptStats").textContent=life==="work"?"Interruptions: "+i.count+" | Focus before interruptions: "+(Math.round(i.minutes*10)/10)+" min":"";
+}
+function sound(){
+try{
+var c=new(window.AudioContext||window.webkitAudioContext)();
+var o=c.createOscillator(),g=c.createGain();
+o.frequency.value=700;g.gain.value=.08;
+o.connect(g);g.connect(c.destination);
+o.start();o.stop(c.currentTime+.25);
+o.onended=function(){c.close()};
+}catch(e){}
+}
+function finish(){
+running=false;clearInterval(ticker);remaining=0;
+if(mode==="focus"){
+var k=day(),t=data[life].history[k]||{count:0,minutes:0};
+t.count++;
+t.minutes=Math.round(((t.minutes||0)+total/60)*10)/10;
+data[life].history[k]=t;save();stats();
+message("Focus complete! ✨");
+}else message("Break complete! 🌱");
+sound();
+}
+function sync(){
+if(running)remaining=Math.max(0,Math.ceil((deadline-Date.now())/1000));
+if(running&&remaining<=0)finish();
+$("clock").textContent=String(Math.floor(remaining/60)).padStart(2,"0")+":"+String(remaining%60).padStart(2,"0");
+$("ring").style.setProperty("--progress",Math.max(0,Math.min(100,(1-remaining/total)*100))+"%");
+$("modeLabel").textContent={focus:"Time to focus 🌱",short:"Enjoy a little rest ☕",long:"A longer rest 🌷"}[mode];
+$("start").textContent=running?"Ⅱ Pause":"▶ Start";
+}
+function pause(){
+if(running){
+remaining=Math.max(0,Math.ceil((deadline-Date.now())/1000));
+running=false;clearInterval(ticker);
+}
+sync();
+}
+function setMode(m){
+pause();mode=m;remaining=data[life].lengths[m]*60;total=remaining;
+message("Ready when you are");
+document.querySelectorAll("[data-mode]").forEach(function(b){
+b.classList.toggle("active",b.dataset.mode===mode);
+});
+sync();
+}
+function settings(){
+[["focusLength","focus"],["shortLength","short"],["longLength","long"]].forEach(function(p){
+$(p[0]).value=data[life].lengths[p[1]];
+});
+var s=$("subject");s.innerHTML="";
+categories[life].forEach(function(c){
+var o=document.createElement("option");o.value=c;o.textContent=c;s.appendChild(o);
+});
+s.value=data[life].subject;
+$("interrupt").hidden=life!=="work";
+$("statsTitle").textContent=life==="work"?"Today's work wins":"Today's little wins";
+$("hint").textContent=life==="work"?"One work task at a time.":"A little time for yourself.";
+document.querySelectorAll("[data-life]").forEach(function(b){
+b.classList.toggle("active",b.dataset.life===life);
+});
+}
+$("start").addEventListener("click",function(){
+if(running){pause();return}
+if(remaining<=0){remaining=data[life].lengths[mode]*60;total=remaining}
+deadline=Date.now()+remaining*1000;
+running=true;message("You've got this!");
+clearInterval(ticker);ticker=setInterval(sync,250);sync();
+});
+$("reset").addEventListener("click",function(){setMode(mode)});
+$("interrupt").addEventListener("click",function(){
+if(life!=="work"||mode!=="focus"||(!running&&remaining===total)){
+message("Start a work session first.");return;
+}
+pause();
+var elapsed=(total-remaining)/60,k=day();
+var i=data.work.interruptions[k]||{count:0,minutes:0};
+i.count++;i.minutes=Math.round((i.minutes+elapsed)*10)/10;
+data.work.interruptions[k]=i;save();
+setMode("focus");stats();
+message("Interruption recorded. Restart when ready.");
+});
+document.querySelectorAll("[data-mode]").forEach(function(b){
+b.addEventListener("click",function(){setMode(b.dataset.mode)});
+});
+document.querySelectorAll("[data-life]").forEach(function(b){
+b.addEventListener("click",function(){
+if(life===b.dataset.life)return;
+pause();life=b.dataset.life;settings();setMode("focus");stats();
+});
+});
+[["focusLength","focus",180],["shortLength","short",60],["longLength","long",90]].forEach(function(p){
+$(p[0]).addEventListener("change",function(){
+data[life].lengths[p[1]]=Math.max(1,Math.min(p[2],Math.round(Number(this.value)||1)));
+this.value=data[life].lengths[p[1]];
+save();if(mode===p[1])setMode(mode);
+});
+});
+$("subject").addEventListener("change",function(){
+data[life].subject=this.value;save();
+});
+document.addEventListener("visibilitychange",function(){if(!document.hidden)sync()});
+settings();setMode("focus");stats();
+})();
+</script>
+</body>
+</html>
